@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACCESS_REQUEST.exe</title>
+<style>
+  :root {
+    --bg: #0a0e0c;
+    --panel: #0f1512;
+    --border: #1c2a22;
+    --green: #4ade80;
+    --green-dim: #2d6b45;
+    --amber: #e8b84b;
+    --red: #d9455f;
+    --text: #c9d6cd;
+    --mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(74,222,128,0.05), transparent 40%),
+      radial-gradient(circle at 80% 90%, rgba(217,69,95,0.05), transparent 40%);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .terminal {
+    width: 100%;
+    max-width: 620px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px rgba(74,222,128,0.05), 0 30px 60px -20px rgba(0,0,0,0.6);
+    overflow: hidden;
+  }
+
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #0c120f;
+    border-bottom: 1px solid var(--border);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.r { background: #4a2530; }
+  .dot.y { background: #4a3f25; }
+  .dot.g { background: #254a34; }
+  .titlebar span {
+    margin-left: 8px;
+    font-size: 12px;
+    color: var(--green-dim);
+    letter-spacing: 0.5px;
+  }
+
+  .screen {
+    padding: 28px 26px 30px;
+    font-size: 14px;
+    line-height: 1.75;
+    min-height: 380px;
+  }
+
+  .line { white-space: pre-wrap; opacity: 0; }
+  .prompt-tag { color: var(--green-dim); }
+  .path { color: var(--amber); }
+  .ok { color: var(--green); }
+  .warn { color: var(--red); }
+
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    background: var(--green);
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* --- Riddle screen --- */
+  #riddleScreen .line { opacity: 1; }
+
+  .riddle-form {
+    margin-top: 22px;
+    display: flex;
+    gap: 10px;
+  }
+
+  #riddleInput {
+    flex: 1;
+    background: #0c120f;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    outline: none;
+  }
+  #riddleInput:focus {
+    border-color: var(--green-dim);
+  }
+
+  #submitBtn {
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+  }
+  #submitBtn:hover { background: rgba(74,222,128,0.08); }
+
+  #riddleError {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--red);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  #attemptCount {
+    color: var(--green-dim);
+  }
+  /* --- end riddle screen --- */
+
+  .choice-row {
+    margin-top: 26px;
+    display: flex;
+    gap: 16px;
+    position: relative;
+    height: 54px;
+    opacity: 0;
+  }
+
+  button {
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 12px 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    transition: transform 0.12s ease;
+  }
+
+  #yes {
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+  }
+  #yes:hover { background: rgba(74,222,128,0.08); }
+
+  #no {
+    border: 1px solid #3a2126;
+    color: var(--red);
+  }
+  #no:hover { background: rgba(217,69,95,0.08); }
+
+  .hint {
+    margin-top: 14px;
+    font-size: 11px;
+    color: var(--green-dim);
+    opacity: 0;
+  }
+
+  .final-screen {
+    display: none;
+    text-align: center;
+  }
+  .final-screen.show { display: block; }
+
+  .ascii {
+    color: var(--green);
+    font-size: 11px;
+    line-height: 1.3;
+    white-space: pre;
+    margin: 0 0 18px;
+  }
+
+  .final-msg {
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.8;
+  }
+  .final-msg .ok { font-size: 16px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cursor { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="terminal">
+  <div class="titlebar">
+    <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+    <span>access_request.exe — running</span>
+  </div>
+
+  <!-- Screen 1: riddle gate -->
+  <div class="screen" id="riddleScreen">
+    <div class="line"><span class="prompt-tag">root@coeur</span>:<span class="path">~</span>$ cat devinette.txt</div>
+    <div class="line" style="margin-top:10px;">On me clique, on me partage, et pourtant je peux unir deux personnes pour la vie. Qui suis-je ?</div>
+    <div class="line" style="margin-top:4px; font-size:12px; color:var(--green-dim);">(réponds pour débloquer la suite)</div>
+
+    <div class="riddle-form">
+      <input id="riddleInput" type="text" placeholder="ta réponse..." autocomplete="off">
+      <button id="submitBtn">[ valider ]</button>
+    </div>
+    <div id="riddleError"></div>
+  </div>
+
+  <!-- Screen 2: the actual proposal, hidden until riddle solved -->
+  <div class="screen" id="screen" style="display:none;">
+    <div id="boot"></div>
+
+    <div class="choice-row" id="choiceRow">
+      <button id="yes">[ Y ] accorder l'accès</button>
+      <button id="no">[ N ] refuser</button>
+    </div>
+    <div class="hint" id="hint">réponse honnête appréciée dans les deux cas</div>
+
+    <div class="final-screen" id="finalScreen">
+      <pre class="ascii">
+      .        .
+       \      /
+        \.--./
+     .--` .. `--.
+    /  .`    `.  \
+   |  /   ()   \  |
+    \  `.    .`  /
+     `--` .. `--`
+        /      \
+       /        \
+      </pre>
+      <div class="final-msg">
+        <span class="ok">$ status: ACCESS_GRANTED</span><br>
+        <span id="finalText"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Riddle gate ---------- */
+const ANSWER = "lien";
+let attempts = 0;
+
+function normalize(str) {
+  return str.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function startBootSequence() {
+  const bootDiv = document.getElementById('boot');
+  const choiceRow = document.getElementById('choiceRow');
+  const hint = document.getElementById('hint');
+
+  const bootLines = [
+    { html: '<span class="prompt-tag">root@coeur</span>:<span class="path">~</span>$ ./scan_compatibilite.sh', delay: 0 },
+    { html: 'Analyse en cours<span class="ok">................ OK</span>', delay: 550 },
+    { html: 'Vulnérabilité détectée: <span class="warn">tu me plais</span>', delay: 900 },
+    { html: 'Sévérité: <span class="warn">critique</span> — exploit déjà en cours depuis un moment', delay: 550 },
+    { html: '', delay: 300 },
+    { html: '<span class="prompt-tag">root@coeur</span>:<span class="path">~</span>$ cat requete.txt', delay: 500 },
+    { html: 'Veux-tu bien être en couple avec moi ?', delay: 700 },
+    { html: '', delay: 200 },
+    { html: "En attente d'une réponse<span class=\"cursor\"></span>", delay: 400 },
+  ];
+
+  let cumulative = 0;
+  bootLines.forEach((l) => {
+    cumulative += l.delay;
+    const div = document.createElement('div');
+    div.className = 'line';
+    div.innerHTML = l.html;
+    div.style.transition = 'opacity 0.35s ease';
+    bootDiv.appendChild(div);
+    setTimeout(() => { div.style.opacity = 1; }, cumulative);
+  });
+
+  const revealDelay = cumulative + 500;
+  setTimeout(() => {
+    choiceRow.style.transition = 'opacity 0.4s ease';
+    choiceRow.style.opacity = 1;
+    hint.style.transition = 'opacity 0.4s ease';
+    hint.style.opacity = 1;
+  }, revealDelay);
+}
+
+function unlockQuestion() {
+  document.getElementById('riddleScreen').style.display = 'none';
+  document.getElementById('screen').style.display = 'block';
+  startBootSequence();
+}
+
+document.getElementById('submitBtn').addEventListener('click', () => {
+  const val = document.getElementById('riddleInput').value;
+  const errorBox = document.getElementById('riddleError');
+
+  if (normalize(val) === ANSWER) {
+    unlockQuestion();
+  } else {
+    attempts++;
+    let msg = `ACCESS_DENIED — tentative <span id="attemptCount">${attempts}</span>`;
+    if (attempts >= 3) {
+      msg += '<br>indice: c\'est ce que je suis en train de t\'envoyer, là, tout de suite';
+    }
+    errorBox.innerHTML = msg;
+    errorBox.style.opacity = 1;
+  }
+});
+
+document.getElementById('riddleInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('submitBtn').click();
+});
+
+/* ---------- Proposal screen (Y/N logic) ---------- */
+const yesBtn = document.getElementById('yes');
+const noBtn = document.getElementById('no');
+const finalScreen = document.getElementById('finalScreen');
+const finalText = document.getElementById('finalText');
+const screen = document.getElementById('screen');
+const choiceRowEl = document.getElementById('choiceRow');
+
+function reveal(message) {
+  screen.querySelectorAll('.line, #choiceRow, #hint').forEach(el => {
+    el.style.transition = 'opacity 0.3s ease';
+    el.style.opacity = 0;
+  });
+  setTimeout(() => {
+    document.querySelectorAll('.line, #choiceRow, #hint').forEach(el => el.style.display = 'none');
+    finalScreen.classList.add('show');
+    finalText.textContent = message;
+  }, 350);
+}
+
+yesBtn.addEventListener('click', () => {
+  reveal("Bon bah... on est ensemble, officiellement. À toi de compiler la suite.");
+});
+
+noBtn.addEventListener('click', () => {
+  reveal("Reçu 5/5. Merci de m'avoir répondu franchement, ça compte aussi.");
+});
+</script>
+
+</body>
+</html>
